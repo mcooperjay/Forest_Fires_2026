@@ -103,19 +103,9 @@ ggplot(fires,
 # c(z) -> "constant over time"
 # z -> time-varying effect
 
-# We are doing univariate where Y is an n x T matrix
 
-# univariate model:
-# Y(t) = f(t)  + \int X1(s)\beta(s,t)ds + eps
-set.seed(2121)
-data1 <- pffrSim(scenario="ff", n=40)
-t <- attr(data1, "yindex")
-s <- attr(data1, "xindex")
-m1 <- pffr(Y ~ ff(X1, xind=s), yind=t, data=data1) 
-summary(m1)
-plot(m1, pages=1)
+# Modeling ----------------------------------------------------------------
 
-# Practice using our data
 # Making the dataset for our Y matrix
 Y_dat <- fires_month |>
   pivot_wider(
@@ -123,7 +113,7 @@ Y_dat <- fires_month |>
     values_from = total_size
   )
 
-# Then I want to make this a matrix
+# Then I want to make this a matrix without the year variable
 Y_mat <- as.matrix(Y_dat)[,-1]
 
 # Then do the same for the X matrix
@@ -144,33 +134,51 @@ s <- 1:ncol(X_mat)  # predictor index (months)
 # for total area burned take the log
 Y_log <- log(Y_mat+1)
 
-# Get our model
-model <- pffr(
+## Get our full historical model
+FullModel_Hist <- pffr(
   Y_log ~ ff(X_mat, 
              xind = s,
              limits = function(s, t) s < t),
-  yind = t
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
-summary(model)
-# There is a statistically significant influence, fire counts do affect fire size patterns
-# The effect is structured over time (not constant)
 
-# Mid-season accumulation
-  # Fire counts early in season can influence later burned area due potentially to:
-  # fuel buidup patterns
-  # weather persistence (dry spells)
-  # the effect weakens when months are far apart from each other
+FullHistBetas <- coef(FullModel_Hist, n1 = 1, n2 = 12)$smterms[[2]]$value
 
-plot(model, pages = 2)
-plot(model, scheme = 2)
-gratia::fvisgam(model)
+summary(FullModel_Hist)
+# R-squared of .584
 
-gratia::fvisgam(m1, se = FALSE) +
-  scale_fill_viridis_c(
-    name = "Influence β(s,t)",
-    option = "C"
-  ) +
-  theme_minimal()
+## Get just our full model (not historical)
+FullModel <- pffr(
+  Y_log ~ ff(X_mat, 
+             xind = s),
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
 
-coef(m1)
-predict(m1)
+FullBetas <- coef(FullModel, n1 = 1, n2 = 12)$smterms[[2]]$value
+
+summary(FullModel)
+# R-squared of .563
+
+FullModel2 <- FullModel$smterms[[3]]$coef
+
+## Plot the two betas to compare
+FullBetasdf <- data.frame('t' = c(FullModel2$X.tmat),
+                          's' = c(FullModel2$X.smat),
+                          'beta' = c(FullBetas, FullHistBetas),
+                          'Fit' = factor(rep(c('Full pffr', 'Historical pffr'), times = c(length(FullModel$X.smat))))
+                          )
+
+
+ggplot(data = FullBetasdf[FullBetasdf$Fit == "Full pffr",]) + 
+  geom_raster(aes(x = s, y = t, fill = beta)) + 
+  scale_fill_viridis_c() + 
+  xlab('s') + ylab('t') + theme_bw() + 
+  ggtitle('pffr Surface Fit')
+
+
+# what is the model set up is
+# Try leaving out the most recent 5 years and run prediction, one without s<t and one with
+# com
+# Take out last 5 years and then re run the model using the bigger dataset without the

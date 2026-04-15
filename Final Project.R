@@ -138,47 +138,31 @@ Y_log <- log(Y_mat+1)
 FullModel_Hist <- pffr(
   Y_log ~ ff(X_mat, 
              xind = s,
-             limits = function(s, t) s < t),
+             limits = "s<t"),
   yind = t,
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
-FullHistBetas <- coef(FullModel_Hist, n1 = 1, n2 = 12)$smterms[[2]]$value
+summary(model)
+# There is a statistically significant influence, fire counts do affect fire size patterns
+# The effect is structured over time (not constant)
 
-summary(FullModel_Hist)
-# R-squared of .584
+# Mid-season accumulation
+  # Fire counts early in season can influence later burned area due potentially to:
+  # fuel buidup patterns
+  # weather persistence (dry spells)
+  # the effect weakens when months are far apart from each other
 
-## Get just our full model (not historical)
-FullModel <- pffr(
-  Y_log ~ ff(X_mat, 
-             xind = s),
-  yind = t,
-  bs.int = list(bs = "ps", k = 5, m = c(2,1))
-)
+plot(model, pages = 2)
+plot(model, scheme = 2)
+gratia::fvisgam(model)
 
-FullBetas <- coef(FullModel, n1 = 1, n2 = 12)$smterms[[2]]$value
+gratia::fvisgam(m1, se = FALSE) +
+  scale_fill_viridis_c(
+    name = "Influence β(s,t)",
+    option = "C"
+  ) +
+  theme_minimal()
 
-summary(FullModel)
-# R-squared of .563
-
-FullModel2 <- FullModel$smterms[[3]]$coef
-
-## Plot the two betas to compare
-FullBetasdf <- data.frame('t' = c(FullModel2$X.tmat),
-                          's' = c(FullModel2$X.smat),
-                          'beta' = c(FullBetas, FullHistBetas),
-                          'Fit' = factor(rep(c('Full pffr', 'Historical pffr'), times = c(length(FullModel$X.smat))))
-                          )
-
-
-ggplot(data = FullBetasdf[FullBetasdf$Fit == "Full pffr",]) + 
-  geom_raster(aes(x = s, y = t, fill = beta)) + 
-  scale_fill_viridis_c() + 
-  xlab('s') + ylab('t') + theme_bw() + 
-  ggtitle('pffr Surface Fit')
-
-
-# what is the model set up is
-# Try leaving out the most recent 5 years and run prediction, one without s<t and one with
-# com
-# Take out last 5 years and then re run the model using the bigger dataset without the
+coef(m1)
+predict(m1)

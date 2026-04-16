@@ -138,31 +138,110 @@ Y_log <- log(Y_mat+1)
 FullModel_Hist <- pffr(
   Y_log ~ ff(X_mat, 
              xind = s,
-             limits = "s<t"),
+             limits = 's<t'),
   yind = t,
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
-summary(model)
-# There is a statistically significant influence, fire counts do affect fire size patterns
-# The effect is structured over time (not constant)
+FullHistBetas <- coef(FullModel_Hist, n1 = 12, n2 = 12)$smterms[[2]]$value
 
-# Mid-season accumulation
-  # Fire counts early in season can influence later burned area due potentially to:
-  # fuel buidup patterns
-  # weather persistence (dry spells)
-  # the effect weakens when months are far apart from each other
+summary(FullModel_Hist)
+# R-squared of .584
 
-plot(model, pages = 2)
-plot(model, scheme = 2)
-gratia::fvisgam(model)
+## Get just our full model (not historical)
+FullModel <- pffr(
+  Y_log ~ ff(X_mat, 
+             xind = s),
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
 
-gratia::fvisgam(m1, se = FALSE) +
-  scale_fill_viridis_c(
-    name = "Influence β(s,t)",
-    option = "C"
-  ) +
-  theme_minimal()
+FullBetas <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$value
 
-coef(m1)
-predict(m1)
+summary(FullModel)
+# R-squared of .563
+
+FullCoef <- coef(FullModel, n1 = 12, n2 = 12)
+FullHistCoef <- coef(FullModel_Hist, n1 = 12, n2 = 12)
+
+FullModel2 <- FullCoef$smterms[[2]]$coef
+FullModel2_Hist <- FullHistCoef$smterms[[2]]$coef
+
+## Plot the two betas to compare
+FullBetasdf <- data.frame(
+  't'    = c(FullModel2$X_mat.tmat, FullModel2_Hist$X_mat.tmat),
+  's'    = c(FullModel2$X_mat.smat, FullModel2_Hist$X_mat.smat),
+  'beta' = c(FullModel2$value, FullModel2_Hist$value),
+  'Fit'  = factor(rep(c('Full pffr', 'Historical pffr'),
+                      times = c(nrow(FullModel2),
+                                nrow(FullModel2_Hist))))
+)
+
+## Plot Full pffr surface
+Full <- ggplot(data = FullBetasdf[FullBetasdf$Fit == "Full pffr", ]) +
+  geom_raster(aes(x = s, y = t, fill = beta)) +
+  scale_fill_viridis_c() +
+  xlab('s') + ylab('t') + theme_bw() +
+  ggtitle('pffr Surface Fit')
+
+## Plot Historical pffr surface
+HistPlotData <- FullBetasdf[FullBetasdf$Fit == "Historical pffr", ]
+
+# Set beta to NA wherever s < t
+HistPlotData$beta[HistPlotData$s < HistPlotData$t] <- NA
+
+Full_Hist <- ggplot(data = HistPlotData) +
+  geom_raster(aes(x = s, y = t, fill = beta)) +
+  scale_fill_viridis_c(na.value = "white") +
+  xlab('s') + ylab('t') + theme_bw() +
+  ggtitle('Historical pffr Surface Fit')
+
+
+grid.arrange(Full, Full_Hist)
+
+
+## Full pffr (top plot)
+# The brightest (yellow/green) values are in the bottom-left corner, 
+  # meaning fire counts early in the year (s = 1–3) are the strongest positive 
+  # predictors of area burned in early months (t = 0–3)
+# This gets darker as time goes on so fire counts in the later year don't have 
+  # a big affect on the area burned in early months
+# All beta values are positive, meaning more fires always predicts more area 
+  # burned — just some months more strongly than others
+
+## Historical pffr (bottom plot)
+# This model restricts predictions to only use past information (s < t), 
+  # which is more realistic
+# We can see that there is a stronger relationship in the early months, meaning
+  # that fire counts in the early year are the strongest positive predictors of
+  # fires burned in the early year. But that as time goes on, fire counts in the
+  # later year are less strongly positive predictors of area burned in the early
+  # year
+
+## The main story is that the relationship between fire counts and area burned 
+  # is strongest early in the year and weakens over time.
+# Early season fire counts (January–March) are the most important predictors of 
+  # area burned — this shows up clearly in both models as the bright 
+  # yellow/green in the bottom-left corner
+# The effect decays as the year progresses — by mid-to-late year, knowing how 
+  # many fires occurred doesn't tell you much about how much area will burn, 
+  # suggesting other factors (weather, drought, fuel conditions) become more 
+  # dominant later in the season
+# The historical model confirms this is a real causal-direction signal — 
+  # because it only uses past information (s < t), the fact that the early-month 
+  # pattern survives means it's genuinely predictive, not just a spurious   
+  # correlation from borrowing future data
+#The negative betas visible in the historical plot around mid-year suggest a 
+  # possible suppression effect — perhaps after a high-fire early season, resources are depleted or conditions change such that later fire counts actually correspond to less area burned than expected
+
+# Bottom line for your project: Early season fire activity is a meaningful 
+  # leading indicator of burn area, and a historical functional model is 
+  # appropriate here because it respects the natural time ordering — 
+  # you wouldn't know future fire counts when trying to predict current burn area.
+
+
+
+# what is the model set up is
+# Try leaving out the most recent 5 years and run prediction, one without s<t and one with
+# com
+# Take out last 5 years and then re run the model using the bigger dataset without the

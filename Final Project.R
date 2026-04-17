@@ -409,7 +409,7 @@ B0_matrix <- matrix(B0, nrow = 12, ncol = 5)
 # Get the beta surface matrix (12 x 12)
 B1 <- Train_HistBetas 
 B1 <- matrix(B1, nrow = 12, ncol = 12)
-B1[lower.tri(B1, diag = TRUE)] <- 0
+B1[lower.tri(B1, diag = TRUE)] <- 0 # taking out values where s>=t
 
 # Manual prediction
 n_test <- nrow(X_mat_c_test)
@@ -434,3 +434,61 @@ regular_rmse
 
 # Plot
 
+test_years <- 2016:2020
+
+# --- Actual values (long format)
+actual_long <- as.data.frame(Y_mat_a_test) |>
+  setNames(1:12) |>
+  mutate(year = test_years) |>
+  pivot_longer(-year, names_to = "month", values_to = "actual") |>
+  mutate(month = as.numeric(month))
+
+# Back-transform both to original scale
+train_preds_original <- exp(train_preds) - 1
+yhats_preds_original <- exp(yhats_preds) - 1
+
+# Then redo the long format with back-transformed values
+reg_long <- as.data.frame(train_preds_original) |>
+  setNames(1:12) |>
+  mutate(year = test_years) |>
+  pivot_longer(-year, names_to = "month", values_to = "pred_reg") |>
+  mutate(month = as.numeric(month))
+
+hist_long <- as.data.frame(t(yhats_preds_original)) |>
+  setNames(1:12) |>
+  mutate(year = test_years) |>
+  pivot_longer(-year, names_to = "month", values_to = "pred_hist") |>
+  mutate(month = as.numeric(month))
+
+# Re-join and replot
+plot_dat <- actual_long |>
+  left_join(reg_long, by = c("year", "month")) |>
+  left_join(hist_long, by = c("year", "month")) |>
+  mutate(year = factor(year))
+
+ggplot(plot_dat, aes(x = month, color = year, group = year)) +
+  geom_line(aes(y = actual), linewidth = 0.8) +
+  geom_line(aes(y = pred_reg), linetype = "dashed", linewidth = 0.8) +
+  geom_line(aes(y = pred_hist), linetype = "dotted", linewidth = 0.8) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = "Actual (solid) vs Regular (dashed) vs Historical (dotted) Predictions",
+    x = "Month", y = "Mean Fire Size", color = "Year"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+#REG V ACTUAL
+
+ggplot(plot_dat, aes(x = month, color = year, group = year)) +
+  geom_line(aes(y = actual), linewidth = 0.8) +
+  geom_line(aes(y = pred_reg), linetype = "dashed", linewidth = 0.8) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(
+    title = "Actual (solid) vs Regular Model Predictions (dashed)",
+    x = "Month", y = "Mean Fire Size", color = "Year"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))

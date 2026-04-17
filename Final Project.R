@@ -191,7 +191,7 @@ Full <- ggplot(data = FullBetasdf[FullBetasdf$Fit == "Full pffr", ]) +
 HistPlotData <- FullBetasdf[FullBetasdf$Fit == "Historical pffr", ]
 
 # Set beta to NA wherever s < t
-# HistPlotData$beta[HistPlotData$s >= HistPlotData$t] <- NA
+HistPlotData$beta[HistPlotData$s >= HistPlotData$t] <- NA
 
 Full_Hist <- ggplot(data = HistPlotData) +
   geom_raster(aes(x = s, y = t, fill = beta)) +
@@ -201,38 +201,6 @@ Full_Hist <- ggplot(data = HistPlotData) +
 
 
 grid.arrange(Full, Full_Hist)
-
-## Doing it again but with the log(X) taken
-X_log <- log(X_mat+1)
-
-# Get our full historical model
-FullModel_Hist_log <- pffr(
-  Y_log ~ ff(X_log, 
-             xind = s,
-             limits = 's<t'),
-  yind = t,
-  bs.int = list(bs = "ps", k = 5, m = c(2,1))
-)
-
-FullHistBetas_log <- coef(FullModel_Hist_log, n1 = 12, n2 = 12)$smterms[[2]]$value
-
-summary(FullModel_Hist_log)
-
-# Get just our full model (not historical)
-FullModel_log <- pffr(
-  Y_log ~ ff(X_log, 
-             xind = s),
-  yind = t,
-  bs.int = list(bs = "ps", k = 5, m = c(2,1))
-)
-
-FullBetas_log <- coef(FullModel_log, n1 = 12, n2 = 12)$smterms[[2]]$value
-
-summary(FullModel_log)
-
-FullHistCoef_log <- coef(FullModel_Hist_log, n1 = 12, n2 = 12)
-FullCoef_log <- coef(FullModel_log, n1 = 12, n2 = 12)
-
 
 ## Full pffr (top plot)
 # The brightest (yellow/green) values are in the bottom-left corner, 
@@ -279,6 +247,74 @@ FullCoef_log <- coef(FullModel_log, n1 = 12, n2 = 12)
 # Try leaving out the most recent 5 years and run prediction, one without s<t and one with
 # everything. 
 # Take out last 5 years and then re run the model using the bigger dataset without the
+
+ 
+# Doing it again but with the log(X) taken. It made no difference so ignore ----
+# X_log <- log(X_mat+1)
+
+# # Get our full historical model
+# FullModel_Hist_log <- pffr(
+#   Y_log ~ ff(X_log, 
+#              xind = s,
+#              limits = 's<t'),
+#   yind = t,
+#   bs.int = list(bs = "ps", k = 5, m = c(2,1))
+# )
+
+# FullHistBetas_log <- coef(FullModel_Hist_log, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+# summary(FullModel_Hist_log)
+
+# # Get just our full model (not historical)
+# FullModel_log <- pffr(
+#   Y_log ~ ff(X_log, 
+#              xind = s),
+#   yind = t,
+#   bs.int = list(bs = "ps", k = 5, m = c(2,1))
+# )
+
+# FullBetas_log <- coef(FullModel_log, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+# summary(FullModel_log)
+
+# FullHistCoef_log <- coef(FullModel_Hist_log, n1 = 12, n2 = 12)
+# FullCoef_log <- coef(FullModel_log, n1 = 12, n2 = 12)
+
+# FullModel2_log <- FullCoef$smterms[[2]]$coef
+# FullModel2_Hist_log <- FullHistCoef$smterms[[2]]$coef
+
+# ## Plot the two betas to compare
+# FullBetasdf2 <- data.frame(
+#   't'    = c(FullModel2_log$X_mat.tmat, FullModel2_Hist_log$X_mat.tmat),
+#   's'    = c(FullModel2_log$X_mat.smat, FullModel2_Hist_log$X_mat.smat),
+#   'beta' = c(FullModel2_log$value, FullModel2_Hist_log$value),
+#   'Fit'  = factor(rep(c('Full pffr', 'Historical pffr'),
+#                       times = c(nrow(FullModel2_log),
+#                                 nrow(FullModel2_Hist_log))))
+# )
+
+# ## Plot Full pffr surface
+# Full2 <- ggplot(data = FullBetasdf2[FullBetasdf2$Fit == "Full pffr", ]) +
+#   geom_raster(aes(x = s, y = t, fill = beta)) +
+#   scale_fill_viridis_c() +
+#   xlab('s') + ylab('t') + theme_bw() +
+#   ggtitle('pffr Surface Fit')
+
+# ## Plot Historical pffr surface
+# HistPlotData2 <- FullBetasdf2[FullBetasdf2$Fit == "Historical pffr", ]
+
+# # Set beta to NA wherever s < t
+# HistPlotData2$beta[HistPlotData2$s >= HistPlotData2$t] <- NA
+
+# Full_Hist2 <- ggplot(data = HistPlotData2) +
+#   geom_raster(aes(x = s, y = t, fill = beta)) +
+#   scale_fill_viridis_c(na.value = "white") +
+#   xlab('s') + ylab('t') + theme_bw() +
+#   ggtitle('Historical pffr Surface Fit')
+
+
+# grid.arrange(Full2, Full_Hist2)
+
 
 
 

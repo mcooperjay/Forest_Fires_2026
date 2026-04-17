@@ -189,7 +189,7 @@ Full <- ggplot(data = FullBetasdf[FullBetasdf$Fit == "Full pffr", ]) +
 HistPlotData <- FullBetasdf[FullBetasdf$Fit == "Historical pffr", ]
 
 # Set beta to NA wherever s < t
-HistPlotData$beta[HistPlotData$s < HistPlotData$t] <- NA
+HistPlotData$beta[HistPlotData$s >= HistPlotData$t] <- NA
 
 Full_Hist <- ggplot(data = HistPlotData) +
   geom_raster(aes(x = s, y = t, fill = beta)) +

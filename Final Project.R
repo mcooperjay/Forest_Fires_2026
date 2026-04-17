@@ -134,6 +134,7 @@ s <- 1:ncol(X_mat)  # predictor index (months)
 
 # for total area burned take the log
 Y_log <- log(Y_mat+1)
+X_log <- log(X_mat+1)
 
 ## Get our full historical model
 FullModel_Hist <- pffr(
@@ -149,6 +150,19 @@ FullHistBetas <- coef(FullModel_Hist, n1 = 12, n2 = 12)$smterms[[2]]$value
 summary(FullModel_Hist)
 # R-squared of .584
 
+## Get our full historical model with the log(X) taken
+FullModel_Hist2 <- pffr(
+  Y_log ~ ff(X_log, 
+             xind = s,
+             limits = 's<t'),
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
+
+FullHistBetas2 <- coef(FullModel_Hist2, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+summary(FullModel_Hist2)
+
 ## Get just our full model (not historical)
 FullModel <- pffr(
   Y_log ~ ff(X_mat, 
@@ -162,8 +176,23 @@ FullBetas <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$value
 summary(FullModel)
 # R-squared of .563
 
+## Get just our full model (not historical) with log(x) taken
+FullModel2 <- pffr(
+  Y_log ~ ff(X_log, 
+             xind = s),
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
+
+FullBetas2 <- coef(FullModel2, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+summary(FullModel)
+# R-squared of .563
+
 FullCoef <- coef(FullModel, n1 = 12, n2 = 12)
 FullHistCoef <- coef(FullModel_Hist, n1 = 12, n2 = 12)
+FullHistCoef2 <- coef(FullModel_Hist2, n1 = 12, n2 = 12)
+FullCoef2 <- coef(FullModel2, n1 = 12, n2 = 12)
 
 FullModel2 <- FullCoef$smterms[[2]]$coef
 FullModel2_Hist <- FullHistCoef$smterms[[2]]$coef
@@ -189,7 +218,7 @@ Full <- ggplot(data = FullBetasdf[FullBetasdf$Fit == "Full pffr", ]) +
 HistPlotData <- FullBetasdf[FullBetasdf$Fit == "Historical pffr", ]
 
 # Set beta to NA wherever s < t
-HistPlotData$beta[HistPlotData$s >= HistPlotData$t] <- NA
+# HistPlotData$beta[HistPlotData$s >= HistPlotData$t] <- NA
 
 Full_Hist <- ggplot(data = HistPlotData) +
   geom_raster(aes(x = s, y = t, fill = beta)) +

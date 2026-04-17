@@ -249,7 +249,8 @@ grid.arrange(Full, Full_Hist)
 # Take out last 5 years and then re run the model using the bigger dataset without the
 
  
-# Doing it again but with the log(X) taken. It made no difference so ignore ----
+# Modeling pt.2 ----
+# Doing it again but with the log(X) taken. It made no difference so ignore
 # X_log <- log(X_mat+1)
 
 # # Get our full historical model

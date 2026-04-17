@@ -134,7 +134,6 @@ s <- 1:ncol(X_mat)  # predictor index (months)
 
 # for total area burned take the log
 Y_log <- log(Y_mat+1)
-X_log <- log(X_mat+1)
 
 ## Get our full historical model
 FullModel_Hist <- pffr(
@@ -150,18 +149,6 @@ FullHistBetas <- coef(FullModel_Hist, n1 = 12, n2 = 12)$smterms[[2]]$value
 summary(FullModel_Hist)
 # R-squared of .584
 
-## Get our full historical model with the log(X) taken
-FullModel_Hist2 <- pffr(
-  Y_log ~ ff(X_log, 
-             xind = s,
-             limits = 's<t'),
-  yind = t,
-  bs.int = list(bs = "ps", k = 5, m = c(2,1))
-)
-
-FullHistBetas2 <- coef(FullModel_Hist2, n1 = 12, n2 = 12)$smterms[[2]]$value
-
-summary(FullModel_Hist2)
 
 ## Get just our full model (not historical)
 FullModel <- pffr(
@@ -176,23 +163,9 @@ FullBetas <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$value
 summary(FullModel)
 # R-squared of .563
 
-## Get just our full model (not historical) with log(x) taken
-FullModel2 <- pffr(
-  Y_log ~ ff(X_log, 
-             xind = s),
-  yind = t,
-  bs.int = list(bs = "ps", k = 5, m = c(2,1))
-)
-
-FullBetas2 <- coef(FullModel2, n1 = 12, n2 = 12)$smterms[[2]]$value
-
-summary(FullModel)
-# R-squared of .563
 
 FullCoef <- coef(FullModel, n1 = 12, n2 = 12)
 FullHistCoef <- coef(FullModel_Hist, n1 = 12, n2 = 12)
-FullHistCoef2 <- coef(FullModel_Hist2, n1 = 12, n2 = 12)
-FullCoef2 <- coef(FullModel2, n1 = 12, n2 = 12)
 
 FullModel2 <- FullCoef$smterms[[2]]$coef
 FullModel2_Hist <- FullHistCoef$smterms[[2]]$coef
@@ -228,6 +201,37 @@ Full_Hist <- ggplot(data = HistPlotData) +
 
 
 grid.arrange(Full, Full_Hist)
+
+## Doing it again but with the log(X) taken
+X_log <- log(X_mat+1)
+
+# Get our full historical model
+FullModel_Hist_log <- pffr(
+  Y_log ~ ff(X_log, 
+             xind = s,
+             limits = 's<t'),
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
+
+FullHistBetas_log <- coef(FullModel_Hist_log, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+summary(FullModel_Hist_log)
+
+# Get just our full model (not historical)
+FullModel_log <- pffr(
+  Y_log ~ ff(X_log, 
+             xind = s),
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
+
+FullBetas_log <- coef(FullModel_log, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+summary(FullModel_log)
+
+FullHistCoef_log <- coef(FullModel_Hist_log, n1 = 12, n2 = 12)
+FullCoef_log <- coef(FullModel_log, n1 = 12, n2 = 12)
 
 
 ## Full pffr (top plot)

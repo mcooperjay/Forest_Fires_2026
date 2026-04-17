@@ -240,14 +240,6 @@ grid.arrange(Full, Full_Hist)
   # leading indicator of burn area, and a historical functional model is 
   # appropriate here because it respects the natural time ordering — 
   # you wouldn't know future fire counts when trying to predict current burn area.
-
-
-
-# what is the model set up is
-# Try leaving out the most recent 5 years and run prediction, one without s<t and one with
-# everything. 
-# Take out last 5 years and then re run the model using the bigger dataset without the
-
  
 # Modeling pt.2 ----
 # Doing it again but with the log(X) taken. It made no difference so ignore
@@ -350,7 +342,7 @@ Y_dat_a_test <- a_b_test |>
 # Then I want to make this a matrix without the year variable
 Y_mat_a_test <- as.matrix(Y_dat_a_test)[,-1]
 
-# Then do the same for the X matrix
+## Then do the same for the X matrix
 
 # Create the dataset
 X_dat_c_train <- fire_c_train |>
@@ -387,10 +379,10 @@ Train_Model_Hist <- pffr(
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
-# Train_HistBetas <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$smterms[[2]]$value
+Train_HistBetas <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$smterms[[2]]$value
 
 summary(Train_Model_Hist)
-# R-squared of .584
+# R-squared of .616
 
 ## Get just our full model (not historical)
 Train_Model <- pffr(
@@ -400,51 +392,45 @@ Train_Model <- pffr(
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
-# FullBetas <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$value
+FullBetas <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$value
 
 summary(Train_Model)
+# 0.609
 
 ## Regular Model
 train_preds <- predict(Train_Model, newdata = list(X_mat_c_train = X_mat_c_test))
 
 ## Historical Prediction (done manually)
-# Extract coefficients
-model_coefs <- coef(Train_Model_Hist, n1 = 12, n2 = 12)
 
 # Get intercept
-intercept <- model_coefs$smsterms[[2]]$value
+B0 <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$smterms[[1]]$coef$value
+B0_matrix <- matrix(B0, nrow = 12, ncol = 5)
 
 # Get the beta surface matrix (12 x 12)
-betas <- model_coefs$smterms[[1]]$value 
-betas_mat <- matrix(betas, nrow = 12, ncol = 12)
-dim(betas_mat)
+B1 <- Train_HistBetas 
+B1 <- matrix(B1, nrow = 12, ncol = 12)
+B1[lower.tri(B1, diag = TRUE)] <- 0
 
 # Manual prediction
 n_test <- nrow(X_mat_c_test)
-n_t    <- 12  # months
 
-pred_manual <- matrix(NA, nrow = n_test, ncol = n_t)
+b0_matrix <- B0_matrix*n_test
+b1_matrix <- X_mat_c_test %*% B1
+b1_matrix_t <- t(b1_matrix)
 
-for (i in 1:n_test) {
-  for (tt in 1:n_t) {
-    
-    if (tt == 1) {
-      pred_manual[i, tt] <- intercept
-    } else {
-      x_hist <- X_mat_c_test[i, 1:(tt-1)]
-      b_hist <- betas_mat[1:(tt-1), tt]
-      pred_manual[i, tt] <- intercept + sum(x_hist * b_hist)
-    }
-    
-  }
-}
+yhats_preds <- b0_matrix + b1_matrix_t
 
-# We know that we are trying to predict a full dataset with only a model that has half the values so we just don't know how to 
-# make it work???
-train_hist_preds <- exp(pred_manual) - 1
+## Get RMSE's
+y_test <- t(Y_mat_a_test)
+historical_rmse <- norm(y_test - yhats_preds, type = 'F')
+historical_rmse
+# 1105.237
 
-# GET HELP
-mse_reg <- mean((train_preds-Y_mat_a_test)^2)
-mse_reg
-mse_hist <- mean((train_hist_preds-Y_mat_a_test)^2)
-mse_hist
+train_preds_t <- t(train_preds)
+regular_rmse <- sqrt(mean((y_test - train_preds_t)^2))
+regular_rmse
+# 141.586
+
+
+# Plot
+

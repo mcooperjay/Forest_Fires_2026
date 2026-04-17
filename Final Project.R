@@ -342,8 +342,7 @@ train_preds <- predict(Train_Model, newdata = list(X_mat_c_train = X_mat_c_test)
 model_coefs <- coef(Train_Model_Hist, n1 = 12, n2 = 12)
 
 # Get intercept
-intercept <- model_coefs$pterms
-intercept <- intercept[[1]]
+intercept <- model_coefs$smsterms[[2]]$value
 
 # Get the beta surface matrix (12 x 12)
 betas <- model_coefs$smterms[[1]]$value 

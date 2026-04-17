@@ -1,0 +1,6 @@
+---
+title: "Final Project Report"
+author: "Emily Dunham & Cooper Maughan"
+format: pdf
+editor: visual
+---

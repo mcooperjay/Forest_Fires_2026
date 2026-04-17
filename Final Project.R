@@ -1,6 +1,7 @@
 library(ggplot2)
 library(tidyverse)
 library(refund)
+library(gridExtra)
 
 fires <- vroom::vroom("forestfires.csv")
 
@@ -243,5 +244,138 @@ grid.arrange(Full, Full_Hist)
 
 # what is the model set up is
 # Try leaving out the most recent 5 years and run prediction, one without s<t and one with
-# com
+# everything. 
 # Take out last 5 years and then re run the model using the bigger dataset without the
+
+
+
+# Prediction -------------------------------------------------------------
+
+a_b_train <- fires_month |> 
+  filter(year <= 2015)
+a_b_test <- fires_month |> 
+  filter(year >= 2016)
+
+
+fire_c_train <- fires_counts |> 
+  filter(year <= 2015)
+fire_c_test <- fires_counts |> 
+  filter(year >= 2016)
+
+Y_dat_a_train <- a_b_train |>
+  pivot_wider(
+    names_from = month, # taking the values from month column and makes them each their own column
+    values_from = total_size
+  )
+
+# Then I want to make this a matrix without the year variable
+Y_mat_a_train <- as.matrix(Y_dat_a_train)[,-1]
+
+Y_dat_a_test <- a_b_test |>
+  pivot_wider(
+    names_from = month, # taking the values from month column and makes them each their own column
+    values_from = total_size
+  )
+
+# Then I want to make this a matrix without the year variable
+Y_mat_a_test <- as.matrix(Y_dat_a_test)[,-1]
+
+# Then do the same for the X matrix
+
+# Create the dataset
+X_dat_c_train <- fire_c_train |>
+  pivot_wider(
+    names_from = month, # taking the values from month column and makes them each their own column
+    values_from =n_fires
+  )
+
+# Then I want to make this a matrix
+X_mat_c_train <- as.matrix(X_dat_c_train)[,-1]
+
+X_dat_c_test <- fire_c_test |>
+  pivot_wider(
+    names_from = month, # taking the values from month column and makes them each their own column
+    values_from =n_fires
+  )
+
+# Then I want to make this a matrix
+X_mat_c_test <- as.matrix(X_dat_c_test)[,-1]
+
+t <- 1:ncol(Y_mat_a_train)  # response index (months)
+s <- 1:ncol(X_mat_c_train)  # predictor index (months)
+
+# for total area burned take the log
+Y_log_train <- log(Y_mat_a_train+1)
+
+
+## Get our full historical model
+Train_Model_Hist <- pffr(
+  Y_log_train ~ ff(X_mat_c_train, 
+             xind = s,
+             limits = 's<t'),
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
+
+# Train_HistBetas <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+summary(Train_Model_Hist)
+# R-squared of .584
+
+## Get just our full model (not historical)
+Train_Model <- pffr(
+  Y_log_train ~ ff(X_mat_c_train, 
+             xind = s),
+  yind = t,
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
+
+# FullBetas <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+summary(Train_Model)
+
+## Regular Model
+train_preds <- predict(Train_Model, newdata = list(X_mat_c_train = X_mat_c_test))
+
+## Historical Prediction (done manually)
+# Extract coefficients
+model_coefs <- coef(Train_Model_Hist, n1 = 12, n2 = 12)
+
+# Get intercept
+intercept <- model_coefs$pterms
+intercept <- intercept[[1]]
+
+# Get the beta surface matrix (12 x 12)
+betas <- model_coefs$smterms[[1]]$value 
+betas_mat <- matrix(betas, nrow = 12, ncol = 12)
+dim(betas_mat)
+
+# Manual prediction
+n_test <- nrow(X_mat_c_test)
+n_t    <- 12  # months
+
+pred_manual <- matrix(NA, nrow = n_test, ncol = n_t)
+
+for (i in 1:n_test) {
+  for (tt in 1:n_t) {
+    
+    if (tt == 1) {
+      pred_manual[i, tt] <- intercept
+    } else {
+      x_hist <- X_mat_c_test[i, 1:(tt-1)]
+      b_hist <- betas_mat[1:(tt-1), tt]
+      pred_manual[i, tt] <- intercept + sum(x_hist * b_hist)
+    }
+    
+  }
+}
+
+# We know that we are trying to predict a full dataset with only a model that has half the values so we just don't know how to 
+# make it work???
+train_hist_preds <- exp(pred_manual) - 1
+
+# GET HELP
+mse_reg <- mean((train_preds-Y_mat_a_test)^2)
+mse_reg
+mse_hist <- mean((train_hist_preds-Y_mat_a_test)^2)
+mse_hist

@@ -4,21 +4,18 @@ author: "Emily Dunham & Cooper Maughan"
 format: pdf
 ---
 
-# Introduction
-
-# Methods
-
 # Data Analysis
 
-```{r, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
+```{r}
 library(ggplot2)
 library(tidyverse)
 library(refund)
 library(gridExtra)
-library(patchwork)
 
 fires <- vroom::vroom("forestfires.csv")
 ```
+
+## Exploratory Analysis
 
 ```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 fires_counts <- fires |>
@@ -28,6 +25,21 @@ fires_counts <- fires |>
   ) |>
   count(year, month, name = "n_fires")
 
+ggplot(
+  fires_counts,
+  aes(x = month, y = n_fires, color = factor(year), group = year)
+) +
+  geom_line() +
+  labs(
+    title = "Fire counts per month",
+    x = "Month",
+    y = "Number of fires",
+    color = "Year"
+  ) +
+  theme_minimal()
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 fires_month <- fires |>
   mutate(
     year = FIRE_YEAR,
@@ -35,11 +47,24 @@ fires_month <- fires |>
   ) |>
   group_by(year, month) |>
   summarise(total_size = mean(FIRE_SIZE, na.rm = TRUE), .groups = "drop")
+
+ggplot(
+  fires_month,
+  aes(x = month, y = total_size, color = factor(year), group = year)
+) +
+  geom_line() +
+  labs(
+    title = "Total area burned per month",
+    x = "Month",
+    y = "Total FIRE_SIZE",
+    color = "Year"
+  ) +
+  theme_minimal()
 ```
 
 ## Modeling
 
-```{r, echo = FALSE}
+```{r}
 # Making the dataset for our Y matrix
 # Taking the values from month column and makes them each their own column
 Y_dat <- fires_month |>
@@ -47,8 +72,10 @@ Y_dat <- fires_month |>
     names_from = month,
     values_from = total_size
   )
+
 # Then I want to make this a matrix without the year variable
 Y_mat <- as.matrix(Y_dat)[, -1]
+
 # Then do the same for the X matrix
 # Create the dataset
 X_dat <- fires_counts |>
@@ -56,12 +83,16 @@ X_dat <- fires_counts |>
     names_from = month,
     values_from = n_fires
   )
+
 # Then I want to make this a matrix
 X_mat <- as.matrix(X_dat)[, -1]
+
 t <- 1:ncol(Y_mat) # response index (months)
 s <- 1:ncol(X_mat) # predictor index (months)
+
 # For total area burned take the log
 Y_log <- log(Y_mat + 1)
+
 # For fire counts take the log
 X_log <- log(X_mat + 1)
 ```
@@ -75,10 +106,14 @@ FullModel <- pffr(
   method = "NCV",
   bs.int = list(bs = "ps", k = 5, m = c(2, 1))
 )
+
 FullBetas <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$value
+
 R2_reg <- summary(FullModel)
 # R-squared of .568
 ```
+
+$R^2$ = `r R2_reg$r.sq`
 
 ### Historical Model
 
@@ -89,16 +124,19 @@ FullModel_Hist <- pffr(
   method = "NCV",
   bs.int = list(bs = "ps", k = 5, m = c(2, 1))
 )
+
 FullHistBetas <- coef(FullModel_Hist, n1 = 12, n2 = 12)$smterms[[2]]$value
+
 R2_hist <- summary(FullModel_Hist)
 # R-squared of .6
 ```
 
 ## Plotting the Models
 
-```{r, echo = FALSE, message=FALSE}
+```{r, message=FALSE}
 FullModel2 <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$coef
 FullModel2_Hist <- coef(FullModel_Hist, n1 = 12, n2 = 12)$smterms[[2]]$coef
+
 # Creating the dataframe
 FullBetasdf <- data.frame(
   't' = c(FullModel2$X_log.tmat, FullModel2_Hist$X_log.tmat),
@@ -109,6 +147,7 @@ FullBetasdf <- data.frame(
     times = c(nrow(FullModel2), nrow(FullModel2_Hist))
   ))
 )
+
 # Separating the dataframes into two
 # Regular
 Full <- ggplot(data = FullBetasdf[FullBetasdf$Fit == "Full pffr", ]) +
@@ -117,11 +156,14 @@ Full <- ggplot(data = FullBetasdf[FullBetasdf$Fit == "Full pffr", ]) +
   xlab('s') +
   ylab('t') +
   theme_bw() +
-  ggtitle('Regular pffr Surface Fit')
+  ggtitle('pffr Surface Fit')
+
 # Historical
 HistPlotData <- FullBetasdf[FullBetasdf$Fit == "Historical pffr", ]
+
 # Set beta to NA wherever s >= t
 HistPlotData$beta[HistPlotData$s >= HistPlotData$t] <- NA
+
 Full_Hist <- ggplot(data = HistPlotData) +
   geom_raster(aes(x = s, y = t, fill = beta)) +
   scale_fill_viridis_c(na.value = "white") +
@@ -129,20 +171,24 @@ Full_Hist <- ggplot(data = HistPlotData) +
   ylab('t') +
   theme_bw() +
   ggtitle('Historical pffr Surface Fit')
+
+
 grid.arrange(Full, Full_Hist)
 ```
 
 ## Predictions
 
-```{r, echo = FALSE}
+```{r}
 area_train <- fires_month |>
   filter(year <= 2015)
 area_test <- fires_month |>
   filter(year >= 2016)
+
 fires_train <- fires_counts |>
   filter(year <= 2015)
 fires_test <- fires_counts |>
   filter(year >= 2016)
+
 ## Y Matricies
 # Make the training dataset a matrix for the model
 Y_dat_area_train <- area_train |>
@@ -151,6 +197,7 @@ Y_dat_area_train <- area_train |>
     values_from = total_size
   )
 Y_area_train <- as.matrix(Y_dat_area_train)[, -1]
+
 # Make the test dataset a matrix
 Y_dat_area_test <- area_test |>
   pivot_wider(
@@ -158,6 +205,7 @@ Y_dat_area_test <- area_test |>
     values_from = total_size
   )
 Y_area_test <- as.matrix(Y_dat_area_test)[, -1]
+
 ## X matricies
 # Make the training dataset a matrix for the model
 X_dat_fires_train <- fires_train |>
@@ -166,6 +214,7 @@ X_dat_fires_train <- fires_train |>
     values_from = n_fires
   )
 X_fires_train <- as.matrix(X_dat_fires_train)[, -1]
+
 # Make the test dataset a matrix
 X_dat_fires_test <- fires_test |>
   pivot_wider(
@@ -173,15 +222,18 @@ X_dat_fires_test <- fires_test |>
     values_from = n_fires
   )
 X_fires_test <- as.matrix(X_dat_fires_test)[, -1]
+
 t <- 1:ncol(Y_area_train) # response index (months)
 s <- 1:ncol(X_fires_train) # predictor index (months)
+
 # For total area burned take the log
 Y_log_train <- log(Y_area_train + 1)
+
 # For fire counts take the log
 X_log_train <- log(X_fires_train + 1)
 ```
 
-## Regular Train Model
+## Full Train Model
 
 ```{r, warning=FALSE, message=FALSE}
 Train_Model <- pffr(
@@ -190,7 +242,9 @@ Train_Model <- pffr(
   method = "NCV",
   bs.int = list(bs = "ps", k = 5, m = c(2, 1))
 )
+
 Train_FullBetas <- coef(Train_Model, n1 = 12, n2 = 12)$smterms[[2]]$value
+
 R2_full_train <- summary(Train_Model)
 # R^2 = 0.613
 ```
@@ -204,7 +258,9 @@ Train_Model_Hist <- pffr(
   method = "NCV",
   bs.int = list(bs = "ps", k = 5, m = c(2, 1))
 )
+
 Train_HistBetas <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$smterms[[2]]$value
+
 R2_hist_train <- summary(Train_Model_Hist)
 # R-squared of .637
 ```
@@ -217,9 +273,11 @@ reg.train_preds <- predict(
   Train_Model,
   newdata = list(X_log_train = X_log_test)
 )
+
 # Look at RMSE
 y_test <- t(Y_area_test)
 reg.train_preds_t <- t(reg.train_preds)
+
 regular_rmse <- sqrt(mean((y_test - reg.train_preds_t)^2))
 regular_rmse
 ```
@@ -229,59 +287,76 @@ regular_rmse
 ```{r, message=FALSE}
 ## We need to do this manually
 ## Predict function doesn't work with limits
+
 # Get intercept
 smterms <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$smterms[[1]]$value
 pterms <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$pterms[1, 1]
 b0 <- pterms + smterms
 b0_matrix <- matrix(b0, nrow = 12, ncol = 5)
+
 # Get the beta surface matrix (12 x 12)
 b1 <- Train_HistBetas
 b1 <- matrix(b1, nrow = 12, ncol = 12)
 b1[lower.tri(b1, diag = TRUE)] <- 0 # taking out values where s>=t
+
 # Manual prediction
 b1_matrix <- X_log_test %*% b1
 b1_matrix_t <- t(b1_matrix)
+
 hist.train_preds <- b0_matrix + b1_matrix_t
+
 ## Get RMSE's
 historical_rmse <- sqrt(mean((y_test - hist.train_preds)^2))
 historical_rmse
 ```
 
-```{r, echo = FALSE}
+## Plot Predictions (log scale)
+
+```{r}
 test_years <- 2016:2020
 Y_log_test <- log(Y_area_test + 1)
+
 # --- Actual values (long format)
 actual_long <- as.data.frame(Y_log_test) |>
   setNames(1:12) |>
   mutate(year = test_years) |>
   pivot_longer(-year, names_to = "month", values_to = "actual") |>
   mutate(month = as.numeric(month))
+
 # Then redo the long format with back-transformed values
 reg_long <- as.data.frame(reg.train_preds) |>
   setNames(1:12) |>
   mutate(year = test_years) |>
   pivot_longer(-year, names_to = "month", values_to = "pred_reg") |>
   mutate(month = as.numeric(month))
+
 hist_long <- as.data.frame(t(hist.train_preds)) |>
   setNames(1:12) |>
   mutate(year = test_years) |>
   pivot_longer(-year, names_to = "month", values_to = "pred_hist") |>
   mutate(month = as.numeric(month))
+
 # Re-join and replot
 plot_dat <- actual_long |>
   left_join(reg_long, by = c("year", "month")) |>
   left_join(hist_long, by = c("year", "month")) |>
   mutate(year = factor(year))
-p1 <- ggplot(plot_dat, aes(x = month, color = year, group = year)) +
+
+ggplot(plot_dat, aes(x = month, color = year, group = year)) +
   geom_line(aes(y = actual), linewidth = 0.8) +
   geom_line(aes(y = pred_reg), linetype = "dashed", linewidth = 0.8) +
   geom_line(aes(y = pred_hist), linetype = "dotted", linewidth = 0.8) +
   scale_x_continuous(breaks = 1:12, labels = month.abb) +
   labs(
+<<<<<<< HEAD:Final Project Report.qmd
     title = "Actual (solid) vs Regular (dashed) vs Historical (dotted) Predictions",
+    x = "Month", y = "log(Mean Fire Size)", color = "Year"
+=======
+    title = "Log Scale of Actual (solid) vs Regular (dashed) vs Historical (dotted) Predictions",
     x = "Month",
-    y = "log(Mean Fire Size)",
+    y = "Mean Fire Size",
     color = "Year"
+>>>>>>> 19e4aa78020e903c07a4e4cc6c3ac689ac36eeb2:Final_Project_Report.qmd
   ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -289,8 +364,12 @@ p1 <- ggplot(plot_dat, aes(x = month, color = year, group = year)) +
 
 ## Plot Predictions
 
+<<<<<<< HEAD:Final Project Report.qmd
 ```{r notlog, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
-#| fig.height: 7
+=======
+```{r notlog}
+#| echo: true
+>>>>>>> 19e4aa78020e903c07a4e4cc6c3ac689ac36eeb2:Final_Project_Report.qmd
 Train_Model_nl <- pffr(
   Y_area_train ~ ff(X_fires_train, xind = s),
   yind = t,
@@ -380,68 +459,15 @@ plot_dat <- actual_long |>
   left_join(hist_long, by = c("year", "month")) |>
   mutate(year = factor(year))
 
-p2 <- ggplot(plot_dat, aes(x = month, color = year, group = year)) +
+ggplot(plot_dat, aes(x = month, color = year, group = year)) +
   geom_line(aes(y = actual), linewidth = 0.8) +
   geom_line(aes(y = pred_reg), linetype = "dashed", linewidth = 0.8) +
   geom_line(aes(y = pred_hist), linetype = "dotted", linewidth = 0.8) +
   scale_x_continuous(breaks = 1:12, labels = month.abb) +
   labs(
     title = "Actual (solid) vs Regular (dashed) vs Historical (dotted)",
-    x = "Month",
-    y = "Mean Fire Size",
-    color = "Year"
+    x = "Month", y = "Mean Fire Size", color = "Year"
   ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-cowplot::plot_grid(p1, p2, ncol = 1, rel_heights = c(25, 25))
-```
-
-# Conclusion
-
-## What we found:
-
-Our analysis suggests that yes, monthly fire counts do predict mean area burned, with both models explaining a meaningful portion of the variability. The regular model achieved an R² of 0.568 on the full data and 0.613 on the training data, while the historical model performed slightly better at 0.60 and 0.637 respectively. This is noteworthy because the historical model uses strictly less information (only past fire counts), yet predicts better. This suggests the historical constraint actually helps the model generalize rather than hurting it.
-
-The beta surface plots tell the most interesting story. Early season fire counts (January–March) are the strongest positive predictors of area burned, showing up as bright yellow in the bottom-left corner of both surfaces. This effect decays as the year progresses. The historical surface also shows that the same-month and near-future relationships the regular model relies on are not as informative as the early season signal, reinforcing the early-season finding.
-
-For predictions on the held-out 2016–2020 test years, both models achieved similar RMSEs (regular: 141.6, historical: 141.9), meaning neither substantially outperformed the other in actual forecasting despite the historical model fitting the training data better.
-
-## **How certain we are:**
-
-We are moderately uncertain. We only have 29 years of data total, with just 5 test years, so the RMSE comparison is based on a very small test set and could easily flip with different train/test splits. The low effective rank warnings also suggest the fire count curves don't vary much in shape across years, which limits how much the functional predictor can really contribute beyond a scalar summary.
-
-## **Follow-up questions worth exploring:**
-
-The most natural next question is whether adding climate variables like drought index, temperature, or precipitation as scalar predictors alongside the functional fire count predictor would improve predictions. Our plots show the model struggles most with extreme years like 2018 and 2020, which were anomalous fire seasons likely driven by climate conditions not captured in fire counts alone. We'd also ask whether predicting at a regional level rather than nationally would produce stronger relationships, since the national aggregation likely smooths out a lot of meaningful local variation.
-
-# Appendix
-
-## Exploratory Analysis
-
-```{r, echo=TRUE, message=FALSE, warning=FALSE}
-ggplot(
-  fires_counts,
-  aes(x = month, y = n_fires, color = factor(year), group = year)
-) +
-  geom_line() +
-  labs(
-    title = "Fire counts per month",
-    x = "Month",
-    y = "Number of fires",
-    color = "Year"
-  ) +
-  theme_minimal()
-
-ggplot(
-  fires_month,
-  aes(x = month, y = total_size, color = factor(year), group = year)
-) +
-  geom_line() +
-  labs(
-    title = "Total area burned per month",
-    x = "Month",
-    y = "Total FIRE_SIZE",
-    color = "Year"
-  ) +
-  theme_minimal()
 ```

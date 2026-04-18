@@ -17,9 +17,7 @@ fires <- vroom::vroom("forestfires.csv")
 
 ## Exploratory Analysis
 
-Number of Fires
-
-```{r}
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 fires_counts <- fires |>
   mutate(
     year  = FIRE_YEAR,
@@ -36,9 +34,7 @@ ggplot(fires_counts,
 
 ```
 
-Area Burned
-
-```{r}
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 fires_month <- fires |>
   mutate(
     year = FIRE_YEAR,
@@ -92,7 +88,7 @@ X_log <- log(X_mat+1)
 
 ### Regular Model
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 FullModel <- pffr(
   Y_log ~ ff(X_log, 
              xind = s),
@@ -109,7 +105,7 @@ R2_reg <- summary(FullModel)
 
 ### Historical Model
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 FullModel_Hist <- pffr(
   Y_log ~ ff(X_log, 
              xind = s,
@@ -127,7 +123,7 @@ R2_hist <- summary(FullModel_Hist)
 
 ## Plotting the Models
 
-```{r}
+```{r, message=FALSE}
 FullModel2 <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$coef
 FullModel2_Hist <- coef(FullModel_Hist, n1 = 12, n2 = 12)$smterms[[2]]$coef
 
@@ -224,7 +220,7 @@ X_log_train <- log(X_fires_train+1)
 
 ## Full Train Model
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 Train_Model <- pffr(
   Y_log_train ~ ff(X_log_train, 
              xind = s),
@@ -241,7 +237,7 @@ R2_full_train <- summary(Train_Model)
 
 ## Historical Train Model
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 Train_Model_Hist <- pffr(
   Y_log_train ~ ff(X_log_train, 
              xind = s,
@@ -273,7 +269,7 @@ regular_rmse
 
 ## Historical Model Prediction
 
-```{r}
+```{r, message=FALSE}
 ## We need to do this manually
 ## Predict function doesn't work with limits
 
@@ -337,8 +333,8 @@ ggplot(plot_dat, aes(x = month, color = year, group = year)) +
   geom_line(aes(y = pred_hist), linetype = "dotted", linewidth = 0.8) +
   scale_x_continuous(breaks = 1:12, labels = month.abb) +
   labs(
-    title = "Log Scale of Actual (solid) vs Regular (dashed) vs Historical (dotted) Predictions",
-    x = "Month", y = "Mean Fire Size", color = "Year"
+    title = "Actual (solid) vs Regular (dashed) vs Historical (dotted) Predictions",
+    x = "Month", y = "log(Mean Fire Size)", color = "Year"
   ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -346,7 +342,7 @@ ggplot(plot_dat, aes(x = month, color = year, group = year)) +
 
 ## Plot Predictions
 
-```{r notlog}
+```{r notlog, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 Train_Model_nl <- pffr(
   Y_area_train ~ ff(X_fires_train, 
                    xind = s),
@@ -440,7 +436,7 @@ ggplot(plot_dat, aes(x = month, color = year, group = year)) +
   geom_line(aes(y = pred_hist), linetype = "dotted", linewidth = 0.8) +
   scale_x_continuous(breaks = 1:12, labels = month.abb) +
   labs(
-    title = "Actual (solid) vs Regular (dashed) vs Historical (dotted) Predictions",
+    title = "Actual (solid) vs Regular (dashed) vs Historical (dotted)",
     x = "Month", y = "Mean Fire Size", color = "Year"
   ) +
   theme_minimal() +

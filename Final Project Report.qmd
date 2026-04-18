@@ -278,7 +278,9 @@ regular_rmse
 ## Predict function doesn't work with limits
 
 # Get intercept
-b0 <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$smterms[[1]]$value
+smterms <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$smterms[[1]]$value
+pterms <- coef(Train_Model_Hist, n1 = 12, n2 = 12)$pterms[1,1]
+b0 <- pterms + smterms
 b0_matrix <- matrix(b0, nrow = 12, ncol = 5)
 
 # Get the beta surface matrix (12 x 12)
@@ -335,7 +337,7 @@ ggplot(plot_dat, aes(x = month, color = year, group = year)) +
   geom_line(aes(y = pred_hist), linetype = "dotted", linewidth = 0.8) +
   scale_x_continuous(breaks = 1:12, labels = month.abb) +
   labs(
-    title = "Actual (solid) vs Regular (dashed) vs Historical (dotted) Predictions",
+    title = "Log Scale of Actual (solid) vs Regular (dashed) vs Historical (dotted) Predictions",
     x = "Month", y = "Mean Fire Size", color = "Year"
   ) +
   theme_minimal() +

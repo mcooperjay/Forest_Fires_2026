@@ -3,7 +3,8 @@ title: "Final Project Report"
 author: "Emily Dunham & Cooper Maughan"
 format: pdf
 ---
-
+# Introduction
+# Methods
 # Data Analysis
 ```{r, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
 library(ggplot2)

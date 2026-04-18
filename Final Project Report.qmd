@@ -233,7 +233,7 @@ Train_Model <- pffr(
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
-Train_FullBetas <- coef(FullModel, n1 = 12, n2 = 12)$smterms[[2]]$value
+Train_FullBetas <- coef(Train_Model, n1 = 12, n2 = 12)$smterms[[2]]$value
 
 R2_full_train <- summary(Train_Model)
 # R^2 = 0.613
@@ -346,7 +346,68 @@ ggplot(plot_dat, aes(x = month, color = year, group = year)) +
 
 ## Plot Predictions
 
-```{r}
+```{r notlog}
+Train_Model_nl <- pffr(
+  Y_area_train ~ ff(X_fires_train, 
+                   xind = s),
+  yind = t,
+  method = "NCV",
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
+
+Train_FullBetas_nl <- coef(Train_Model_nl, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+R2_full_train_nl <- summary(Train_Model_nl)
+# R^2 = 0.292
+
+Train_Model_Hist_nl <- pffr(
+  Y_area_train ~ ff(X_fires_train, 
+                   xind = s,
+                   limits = 's<t'),
+  yind = t,
+  method = "NCV",
+  bs.int = list(bs = "ps", k = 5, m = c(2,1))
+)
+
+Train_HistBetas_nl <- coef(Train_Model_Hist_nl, n1 = 12, n2 = 12)$smterms[[2]]$value
+
+R2_hist_train_nl <- summary(Train_Model_Hist_nl)
+# R-squared of .321
+
+reg.train_preds_nl <- predict(Train_Model_nl, newdata = list(X_fires_train = X_fires_test))
+
+# Look at RMSE
+y_test <- t(Y_area_test)
+reg.train_preds_t_nl <- t(reg.train_preds_nl)
+
+regular_rmse_nl <- sqrt(mean((y_test - reg.train_preds_t_nl)^2))
+regular_rmse_nl
+#104.20
+
+# Get intercept
+smterms <- coef(Train_Model_Hist_nl, n1 = 12, n2 = 12)$smterms[[1]]$value
+pterms <- coef(Train_Model_Hist_nl, n1 = 12, n2 = 12)$pterms[1,1]
+b0 <- pterms + smterms
+b0_matrix <- matrix(b0, nrow = 12, ncol = 5)
+
+# Get the beta surface matrix (12 x 12)
+b1 <- Train_HistBetas_nl 
+b1 <- matrix(b1, nrow = 12, ncol = 12)
+b1[lower.tri(b1, diag = TRUE)] <- 0 # taking out values where s>=t
+
+# Manual prediction
+b1_matrix <- X_fires_test %*% b1
+b1_matrix_t <- t(b1_matrix)
+
+hist.train_preds_nl <- b0_matrix + b1_matrix_t
+
+## Get RMSE's
+historical_rmse_nl <- sqrt(mean((y_test - hist.train_preds_nl)^2))
+historical_rmse_nl
+# 103.58
+
+test_years <- 2016:2020
+
 # --- Actual values (long format)
 actual_long <- as.data.frame(Y_area_test) |>
   setNames(1:12) |>
@@ -354,18 +415,14 @@ actual_long <- as.data.frame(Y_area_test) |>
   pivot_longer(-year, names_to = "month", values_to = "actual") |>
   mutate(month = as.numeric(month))
 
-# Change back to before log scale
-reg.train_preds_original <- exp(reg.train_preds ) -1
-hist.train_preds_original <- exp(hist.train_preds) -1
-
 # Then redo the long format with back-transformed values
-reg_long <- as.data.frame(reg.train_preds_original) |>
+reg_long <- as.data.frame(reg.train_preds_nl) |>
   setNames(1:12) |>
   mutate(year = test_years) |>
   pivot_longer(-year, names_to = "month", values_to = "pred_reg") |>
   mutate(month = as.numeric(month))
 
-hist_long <- as.data.frame(t(hist.train_preds_original)) |>
+hist_long <- as.data.frame(t(hist.train_preds_nl)) |>
   setNames(1:12) |>
   mutate(year = test_years) |>
   pivot_longer(-year, names_to = "month", values_to = "pred_hist") |>

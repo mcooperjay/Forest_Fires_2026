@@ -6,11 +6,98 @@ format: pdf
 
 # Introduction
 
+Wildfires represent a grwoing threat to ecosystems, communities, and infrastructure across the United States. Understanding what drives and causes the total area burned in a given month, and whether early-season fire activity can serce as a leading indicator, has practical value for resource allocation and risk management. 
+
+This analysis uses the US Wildfire dataset from the USDA in conjunction with the US Forest Service, which contains records of wildfires reported across the US from 1992 to 2020. Each record includes the fire discovery date, containment date, fire size (in acres) geographic location, and cause classification. We aggregate these records to monthly summaries at the national level, producing two functional obsercations per year: a monthly fire count curve and a monthly mean area burned curve. 
+
+We ask two scientific questions:
+
+1. Does the monthly profile of fire counts across a year predict the monthly profile of mean area burned that same year? 
+
+2. Does restricting predictions to only use past fire counts improve or degrade predictive performance compared to using the full-year fire count profile?
+
+To answer these questions we apply the **historical functional linear 
+model** of Malfait and Ramsay (2003), which models a functional response 
+as a smooth function of only the past history of a functional predictor. 
+This is a natural fit for our setting because it does not make 
+scientific sense to use fire counts from a later month to predict area 
+burned in an earlier month. We compare this to an unrestricted 
+function-on-function regression model as a baseline, both fitted using 
+the `pffr` framework in the `refund` package for R.
+
 # Methods
+
+## Functional Data Setup
+
+Let $i = 1, \ldots, n$ index years and $t \in \{1, \ldots, 12\}$ index 
+months. For each year $i$ we observe:
+
+- $Y_i(t)$: mean area burned (acres) in month $t$
+- $X_i(s)$: number of fires recorded in month $s$
+
+We apply a $\log(x + 1)$ transformation to both $Y_i(t)$ and $X_i(s)$ 
+to reduce skewness before modeling.
+
+## Historical Functional Linear Model
+
+Malfait and Ramsay (2003) introduced the historical functional linear 
+model for settings where a functional predictor $X_i(s)$ influences a 
+functional response $Y_i(t)$, but only through its past values. The 
+model is:
+
+$$
+Y_i(t) = \mu(t) + \int_{\mathcal{S}(t)} \beta(s, t)\, X_i(s)\, ds + 
+\varepsilon_i(t)
+$$
+
+where the integration domain $\mathcal{S}(t) = \{s : s < t\}$ enforces 
+the historical constraint, $\mu(t)$ is a smooth intercept function, 
+$\beta(s, t)$ is a bivariate coefficient surface defined only on the 
+region $s < t$, and $\varepsilon_i(t)$ is a mean-zero error process. 
+The surface $\beta(s, t)$ captures the influence that fire counts at 
+month $s$ have on mean area burned at month $t$, restricted to cases 
+where $s$ precedes $t$.
+
+We estimate this model using the `pffr` function from the `refund` 
+package in R, which represents $\beta(s, t)$ using penalized bivariate 
+splines and selects smoothing parameters via neighborhood cross-validation 
+(NCV). The historical constraint is specified via `limits = 's<t'` in 
+the `ff()` term.
+
+## Comparison Model
+
+As a baseline we also fit the unrestricted function-on-function 
+regression model:
+
+$$
+Y_i(t) = \mu(t) + \int_{\mathcal{S}} \beta(s, t)\, X_i(s)\, ds + 
+\varepsilon_i(t)
+$$
+
+where integration is over the full domain $\mathcal{S} = \{1, \ldots, 
+12\}$. This model is scientifically less appropriate since it allows 
+future fire counts to inform predictions of past area burned, but serves 
+as a useful upper bound on in-sample fit.
+
+## Prediction and Evaluation
+
+We split the data into a training set (1992–2015, $n = 24$ years) and a 
+test set (2016–2020, $n = 5$ years). The unrestricted model predictions 
+are obtained via `predict.pffr`. Because `predict.pffr` does not 
+currently support the `limits` argument, historical model test 
+predictions are computed manually using the estimated intercept 
+$\hat\mu(t)$ and coefficient surface $\hat\beta(s, t)$:
+
+$$
+\hat{Y}_i(t) = \hat\mu(t) + \sum_{s < t} \hat\beta(s, t)\, X_i(s)
+$$
+
+Both models are evaluated using root mean squared error (RMSE) on the 
+held-out test years, computed on the original (non-log) scale.
 
 # Data Analysis
 
-```{r, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 library(ggplot2)
 library(tidyverse)
 library(refund)
@@ -20,7 +107,7 @@ library(patchwork)
 fires <- vroom::vroom("forestfires.csv")
 ```
 
-```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
 fires_counts <- fires |>
   mutate(
     year = FIRE_YEAR,
@@ -36,8 +123,6 @@ fires_month <- fires |>
   group_by(year, month) |>
   summarise(total_size = mean(FIRE_SIZE, na.rm = TRUE), .groups = "drop")
 ```
-
-## Modeling
 
 ```{r, echo = FALSE}
 # Making the dataset for our Y matrix

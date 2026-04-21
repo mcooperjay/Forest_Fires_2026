@@ -141,6 +141,7 @@ FullModel_Hist <- pffr(
              xind = s,
              limits = 's<t'),
   yind = t,
+  method = "GCV.Cp",
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
@@ -155,6 +156,7 @@ FullModel <- pffr(
   Y_log ~ ff(X_mat, 
              xind = s),
   yind = t,
+  method = "GCV.Cp",
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
@@ -211,7 +213,7 @@ grid.arrange(Full, Full_Hist)
 # All beta values are positive, meaning more fires always predicts more area 
   # burned — just some months more strongly than others
 
-## Historical pffr (bottom plot)
+## Historical pffr (bottom plot) EDIT
 # This model restricts predictions to only use past information (s < t), 
   # which is more realistic
 # We can see that there is a stronger relationship in the early months, meaning
@@ -376,6 +378,7 @@ Train_Model_Hist <- pffr(
              xind = s,
              limits = 's<t'),
   yind = t,
+  method = "GCV.Cp",
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
@@ -389,6 +392,7 @@ Train_Model <- pffr(
   Y_log_train ~ ff(X_mat_c_train, 
              xind = s),
   yind = t,
+  method = "GCV.Cp",
   bs.int = list(bs = "ps", k = 5, m = c(2,1))
 )
 
@@ -412,25 +416,23 @@ B1 <- matrix(B1, nrow = 12, ncol = 12)
 B1[lower.tri(B1, diag = TRUE)] <- 0 # taking out values where s>=t
 
 # Manual prediction
-n_test <- nrow(X_mat_c_test)
 
-b0_matrix <- B0_matrix*n_test
 b1_matrix <- X_mat_c_test %*% B1
 b1_matrix_t <- t(b1_matrix)
 
-yhats_preds <- b0_matrix + b1_matrix_t
+yhats_preds <- B0_matrix + b1_matrix_t
 
 ## Get RMSE's
 y_test <- t(Y_mat_a_test)
-historical_rmse <- norm(y_test - yhats_preds, type = 'F')
+historical_rmse <- sqrt(mean((y_test - yhats_preds)^2))
 historical_rmse
-# 1105.237
+# 143.81
+
 
 train_preds_t <- t(train_preds)
 regular_rmse <- sqrt(mean((y_test - train_preds_t)^2))
 regular_rmse
 # 141.586
-
 
 # Plot
 
@@ -492,3 +494,4 @@ ggplot(plot_dat, aes(x = month, color = year, group = year)) +
   ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
